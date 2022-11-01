@@ -1,7 +1,8 @@
 # blastnpxparse
 Making table from BLAST search result file
 
-Usage
+Usage:
+
   ./blastnpxparse.py [input file: blast result file with outfmt=11 option]
 
 Requirement
