@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-# 2022-10-21 version 8.1: blastnpxparse.py
+# 2022-12-12 version 9.2: blastnpxparse.py
 
 import sys
 import os
@@ -9,6 +9,8 @@ import subprocess
 import csv
 from bs4 import BeautifulSoup
 import collections
+import multiprocessing
+from multiprocessing import Pool
 
 # command verification 
 args = sys.argv
@@ -23,6 +25,7 @@ file_conversion = '0'
 path_input = os.getcwd()
 annotation_file = file_prefix_init + '.ann'
 ann_file_exist = '0'
+num_core = int(multiprocessing.cpu_count())
 BREAD_CRUMB_file = '/home/makawazoe/TXSearchfile/220916_TAX_ID__BREAD_CRUMB_test.tsv'
 
 # file handling
@@ -104,6 +107,8 @@ result_queries = soup_1.find_all('BlastOutput2')
 # extract and file output
 output_file1 = file_prefix + '_' + mode + 'table.tsv'
 output_file2 = file_prefix + '_' + mode + 'summary.tsv'
+output_file3 = file_prefix + '_' + mode + '_organism.tsv'
+
 header1 = ["query acc", "query length", "query taxid", "query scientific name", "hit number", "hit acc", "taxid", "scientific name", "hit entry length", "alignment#", "bit-score", "score", "E-value", "identity", "query strand", "hit strand", "query from", "query to", "hit from", "hit to", "alignment length", "gap", "coverage (%)", "identity (%)", "hit title"]
 header2 = ["query acc", "query length", "hit number", "hit acc", "hit title", "taxid", "scientific name", "hit entry length", "alignment#", "bit-score", "score", "E-value", "identity", "positive", "query from", "query to", "hit from", "hit to", "alignment length", "gap", "coverage (%)", "identity (%)"]
 header3 = ["query acc", "query length", "hit number", "hit acc", "hit title", "taxid", "scientific name", "hit entry length", "alignment#", "bit-score", "score", "E-value", "identity", "positive", "query frame", "query from", "query to", "hit from", "hit to", "alignment length", "gap", "coverage (%)", "identity (%)"]
@@ -121,14 +126,17 @@ elif mode == 'blastx':
         writer = csv.writer(f, delimiter='\t')
         writer.writerow(header3)
 
-print("\nExtracting ...\n")
+print("\nExtracting BLAST result...\n")
 
 for loop_count, result_query in enumerate(result_queries):
     if result_query.find('message') is None:
         pass
     elif result_query.find('message').text == 'No hits found':
         query_acc = result_query.find('query-title').text
-        query_summary = str.splitlines(query_acc) + str.splitlines('No hits found')
+        query_summary = str.splitlines(query_acc) + str.splitlines('No hits found') + [""] + [""]
+        with open(output_file1, "a", encoding="utf-8") as f:
+            writer = csv.writer(f, delimiter='\t')
+            writer.writerow(query_summary)
         with open(output_file2, "a", encoding="utf-8") as f:
             writer = csv.writer(f, delimiter='\t')
             writer.writerow(query_summary)
@@ -264,48 +272,90 @@ for loop_count, result_query in enumerate(result_queries):
                 writer.writerow(tsv_out)
 
     if mode == 'blastn':
-        total1 = collections.Counter(hit_taxid_total)   # blastn specific
-        if query_taxid[loop_count:loop_count+1] == ["0"]:
+        total_merge = zip(hit_taxid_total, hit_sciname_total)
+        total1 = collections.Counter(total_merge)   # blastn specific
+        with open(output_file2, "a", encoding="utf-8") as f:
+            writer = csv.writer(f, delimiter='\t')
             query_summary = str.splitlines(query_acc) + str.splitlines(hit_num_total[-1]) + query_taxid[loop_count:loop_count+1] + query_organism[loop_count:loop_count+1]
-            print("\n")
-            print("Entry: " + query_acc + "\n")
-            print("Number: " + str(loop_count+1) + "\n")
-            print("Query organism: " + query_organism[loop_count:loop_count+1] + "\n")
-        else:
-            query_search_string1 = '"^' + query_taxid[loop_count] + r'\s"'
-#            print(query_search_string1)
-            grep_cmd_list1 = ["grep"] + str.split(eval(query_search_string1)) + str.split(BREAD_CRUMB_file)
-            grep_cmd1 = map(str, grep_cmd_list1)
-            grep_run1 = subprocess.run(grep_cmd1, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-#            grep_run1 = subprocess.run(['grep', query_search_string1, BREAD_CRUMB_file], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-            print("\n")
-            print("Entry: " + query_acc + "\n")
-            print("Number: " + str(loop_count+1) + "\n")
-            print(*grep_run1.stdout.split(':::')[1::2])
-            query_summary = str.splitlines(query_acc) + str.splitlines(hit_num_total[-1]) + query_taxid[loop_count:loop_count+1] + grep_run1.stdout.split(':::')[1::2]
-            print("\n")
-            print("Extracting lineage ...\n")
+            writer.writerow(query_summary)
+            for k1, v1 in total1.items():
+                hit_summary = [""] + str.splitlines(str(v1)) + str.splitlines(k1[0]) + str.splitlines(k1[1])
+                writer.writerow(hit_summary)
+        with open(output_file3, "a", encoding="utf-8") as f:
+            writer = csv.writer(f, delimiter='\t')
+            query_summary = str.splitlines(query_acc) + query_taxid[loop_count:loop_count+1] + query_organism[loop_count:loop_count+1]
+            writer.writerow(query_summary)
+            for k2, v2 in zip(hit_taxid_total, hit_sciname_total):
+                hit_summary = [""] + str.splitlines(k2) + str.splitlines(v2)
+                writer.writerow(hit_summary)
     else:
-        query_summary = str.splitlines(query_acc) + str.splitlines(hit_num_total[-1]) + query_taxid[loop_count:loop_count+1]
+        query_summary = str.splitlines(query_acc) + str.splitlines(hit_num_total[-1])
         total1 = collections.Counter(hit_title_total)   # blastp, blastx
-
-    with open(output_file2, "a", encoding="utf-8") as f:
-        writer = csv.writer(f, delimiter='\t')
-        writer.writerow(query_summary)
-        for k, v in total1.items():
-            hit_summary = [""]
-            if mode != 'blastn':
-                hit_summary = hit_summary + str.splitlines(str(v)) + str.splitlines(str(k))
-                writer.writerow(hit_summary)
-            elif k == 'null':
-                hit_summary = hit_summary + str.splitlines(str(v)) + str.splitlines(str(k))
-                writer.writerow(hit_summary)
-            else:
-                hit_search_string1 = '"^' + str(k) + r'\s"'
-                grep_cmd_list2 = ["grep"] + str.split(eval(hit_search_string1)) + str.split(BREAD_CRUMB_file)
-                grep_cmd2 = map(str, grep_cmd_list2)
-                grep_run2 = subprocess.run(grep_cmd2, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-                hit_summary = hit_summary + str.splitlines(str(v)) + str.splitlines(str(k)) + grep_run2.stdout.split(':::')[1::2]
+        with open(output_file2, "a", encoding="utf-8") as f:
+            writer = csv.writer(f, delimiter='\t')
+            writer.writerow(query_summary)
+            for k3, v3 in total1.items():
+                hit_summary = [""] + str.splitlines(str(v3)) + str.splitlines(str(k3))
                 writer.writerow(hit_summary)  
+
+# lineage extraction
+if mode == 'blastn':
+    output_file4 = file_prefix + '_' + mode + 'summary_lineage.tsv'
+#    output_file5 = file_prefix + '_' + mode + '_lineage.tsv'
+
+    def grepBC1(row_summary):
+        acc = row_summary[0:1]
+        number = row_summary[1:2]
+        taxid = row_summary[2:3]
+        sciname = row_summary[3:4]
+        if taxid == ["0"] or taxid == ["null"] or number == ['No hits found']:
+            print("No extraction: " + taxid[0])
+            lineage_result = acc + number + taxid + sciname
+        else:
+            print("Extracting taxid: " + taxid[0])
+            hit_search_string1 = '"^' + taxid[0] + r'\s"'
+            grep_cmd_list2 = ["grep"] + str.split(eval(hit_search_string1)) + str.split(BREAD_CRUMB_file)
+            grep_cmd2 = map(str, grep_cmd_list2)
+            grep_run2 = subprocess.run(grep_cmd2, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            lineage_result = acc + number + taxid + grep_run2.stdout.split(':::')[1::2]
+        return lineage_result
+
+#    def grepBC2(row_summary):
+#        acc = row_summary[0:1]
+#        taxid = row_summary[1:2]
+#        sciname = row_summary[2:3]
+#        if taxid == ["0"] or taxid == ["null"]:
+#            print("No extraction: " + taxid[0])
+#            lineage_result = acc + taxid + sciname
+#        else:
+#            print("Extracting taxid: " + taxid[0])
+#            hit_search_string1 = '"^' + taxid[0] + r'\s"'
+#            grep_cmd_list2 = ["grep"] + str.split(eval(hit_search_string1)) + str.split(BREAD_CRUMB_file)
+#            grep_cmd2 = map(str, grep_cmd_list2)
+#            grep_run2 = subprocess.run(grep_cmd2, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+#            lineage_result = acc + taxid + grep_run2.stdout.split(':::')[1::2]
+#        return lineage_result
+
+    with open(output_file2, "r", encoding="utf-8") as f:
+        tsv1 = csv.reader(f, delimiter='\t')
+        content1 = [row for row in tsv1]
+    print("\nExtracting lineage for summary...\n")
+    if __name__ == '__main__':
+        with Pool(num_core) as p:
+            with open(output_file4, "w", encoding="utf-8") as f:
+                writer = csv.writer(f, delimiter="\t")
+                writer.writerows(p.map(grepBC1, content1))
+
+#    with open(output_file3, "r", encoding="utf-8") as f:
+#        tsv2 = csv.reader(f, delimiter='\t')
+#        content2 = [row for row in tsv2]
+#    print("\nExtracting lineage for list...\n")
+#    if __name__ == '__main__':
+#        with Pool(num_core) as p:
+#            with open(output_file5, "w", encoding="utf-8") as f:
+#                writer = csv.writer(f, delimiter="\t")
+#                writer.writerows(p.map(grepBC2, content2))
+else:
+    pass
 
 print("\nDone\n")
