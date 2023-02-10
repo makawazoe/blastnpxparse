@@ -26,7 +26,7 @@ path_input = os.getcwd()
 annotation_file = file_prefix_init + '.ann'
 ann_file_exist = '0'
 num_core = int(multiprocessing.cpu_count())
-BREAD_CRUMB_file = '/home/makawazoe/TXSearchfile/220916_TAX_ID__BREAD_CRUMB_test.tsv'
+BREAD_CRUMB_file = '/home/makawazoe/TXSearchfile/TAX_ID__BREAD_CRUMB.tsv'
 
 # file handling
 query_taxid =[]
