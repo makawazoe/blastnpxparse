@@ -330,7 +330,7 @@ if mode == 'blastn':
                 lineage_result = acc + number + taxid + grep_run3.stdout.split(':::')[1::2]
                 with open(tmp_file1, "a", encoding="utf-8") as f:
                     writer = csv.writer(f, delimiter="\t")
-                    writer.writerow(str(grep_run3.stdout))
+                    writer.writerow(grep_run3.stdout.split('\t'))
         return lineage_result
 
 #    def grepBC2(row_summary):
