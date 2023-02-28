@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-# 2022-12-12 version 9.2: blastnpxparse.py
+# 2023-02-28 version 9.3: blastnpxparse.py
 
 import sys
 import os
@@ -302,6 +302,10 @@ for loop_count, result_query in enumerate(result_queries):
 if mode == 'blastn':
     output_file4 = file_prefix + '_' + mode + 'summary_lineage.tsv'
 #    output_file5 = file_prefix + '_' + mode + '_lineage.tsv'
+    tmp_file1 = 'lineage_extracted.tsv'
+    with open(tmp_file1, "w", encoding="utf-8") as f:
+        writer = csv.writer(f, delimiter="\t")
+        f.write('')
 
     def grepBC1(row_summary):
         acc = row_summary[0:1]
@@ -314,10 +318,19 @@ if mode == 'blastn':
         else:
             print("Extracting taxid: " + taxid[0])
             hit_search_string1 = '"^' + taxid[0] + r'\s"'
-            grep_cmd_list2 = ["grep"] + str.split(eval(hit_search_string1)) + str.split(BREAD_CRUMB_file)
+            grep_cmd_list2 = ["grep"] + str.split(eval(hit_search_string1)) + str.split(tmp_file1)
             grep_cmd2 = map(str, grep_cmd_list2)
             grep_run2 = subprocess.run(grep_cmd2, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-            lineage_result = acc + number + taxid + grep_run2.stdout.split(':::')[1::2]
+            if grep_run2.stdout:
+                lineage_result = acc + number + taxid + grep_run2.stdout.split(':::')[1::2]
+            elif not grep_run2.stdout:
+                grep_cmd_list3 = ["grep"] + str.split(eval(hit_search_string1)) + str.split(BREAD_CRUMB_file)
+                grep_cmd3 = map(str, grep_cmd_list3)
+                grep_run3 = subprocess.run(grep_cmd3, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                lineage_result = acc + number + taxid + grep_run3.stdout.split(':::')[1::2]
+                with open(tmp_file1, "a", encoding="utf-8") as f:
+                    writer = csv.writer(f, delimiter="\t")
+                    writer.writerow(str(grep_run3.stdout))
         return lineage_result
 
 #    def grepBC2(row_summary):
