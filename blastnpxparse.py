@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-# 2023-02-28 version 9.3: blastnpxparse.py
+# 2023-03-02 version 9.3: blastnpxparse.py
 
 import sys
 import os
@@ -304,7 +304,6 @@ if mode == 'blastn':
 #    output_file5 = file_prefix + '_' + mode + '_lineage.tsv'
     tmp_file1 = 'lineage_extracted.tsv'
     with open(tmp_file1, "w", encoding="utf-8") as f:
-        writer = csv.writer(f, delimiter="\t")
         f.write('')
 
     def grepBC1(row_summary):
@@ -318,19 +317,23 @@ if mode == 'blastn':
         else:
             print("Extracting taxid: " + taxid[0])
             hit_search_string1 = '"^' + taxid[0] + r'\s"'
-            grep_cmd_list2 = ["grep"] + str.split(eval(hit_search_string1)) + str.split(tmp_file1)
+            grep_cmd_list2 = ["grep"] + ["-m"] + ["1"] + str.split(eval(hit_search_string1)) + str.split(tmp_file1)
             grep_cmd2 = map(str, grep_cmd_list2)
             grep_run2 = subprocess.run(grep_cmd2, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-            if grep_run2.stdout:
-                lineage_result = acc + number + taxid + grep_run2.stdout.split(':::')[1::2]
-            elif not grep_run2.stdout:
-                grep_cmd_list3 = ["grep"] + str.split(eval(hit_search_string1)) + str.split(BREAD_CRUMB_file)
+            grep_run2_result = grep_run2.stdout.strip('\n')
+            lineage_result = acc + number + taxid + grep_run2_result.split(':::')[1::2]
+            if not grep_run2_result:
+                grep_cmd_list3 = ["grep"] + ["-m"] + ["1"] + str.split(eval(hit_search_string1)) + str.split(BREAD_CRUMB_file)
                 grep_cmd3 = map(str, grep_cmd_list3)
                 grep_run3 = subprocess.run(grep_cmd3, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-                lineage_result = acc + number + taxid + grep_run3.stdout.split(':::')[1::2]
-                with open(tmp_file1, "a", encoding="utf-8") as f:
-                    writer = csv.writer(f, delimiter="\t")
-                    writer.writerow(grep_run3.stdout.split('\t'))
+                grep_run3_result = grep_run3.stdout.strip('\n')
+                lineage_result = acc + number + taxid + grep_run3_result.split(':::')[1::2]
+                if grep_run3_result:
+                    with open(tmp_file1, "a", encoding="utf-8") as f:
+                        writer = csv.writer(f, delimiter="\t")
+                        writer.writerow(grep_run3_result.split('\t'))
+                elif not grep_run3_result:
+                    pass
         return lineage_result
 
 #    def grepBC2(row_summary):
